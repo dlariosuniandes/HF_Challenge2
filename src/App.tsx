@@ -272,12 +272,6 @@ const test = {
         value: "DE81200505501265402568",
         hasError: false,
       },
-      {
-        id: "4c212130",
-        prop: "iban",
-        value: "DE81200505501265402568",
-        hasError: false,
-      },
     ],
   },
 };
