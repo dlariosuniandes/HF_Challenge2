@@ -41,22 +41,33 @@ function isString(value: unknown): value is string {
   return typeof value === "string";
 }
 
-const getIndexFromKey = (key: string): string => {
-  return "res." + key;
+const numberRegEx = RegExp(/^\d{1,10}$/);
+
+const getIndexFromKey = (keys: string[]): string => {
+  return keys.reduce((acc, key, index) => {
+    const isNumber = numberRegEx.test(key);
+    if (isNumber) {
+      return `${acc}[${key}]`;
+    } else {
+      return index === 0 ? `${key}` : `${acc}.${key}`;
+    }
+  }, "");
 };
 
 const getIndexValueFromObject = (index: string, object: unknown): string => {
   const setOfKeys = index.match(/([^[\].]+)/g);
-  let result: unknown = { res: object };
-  while (setOfKeys && setOfKeys?.length > 0 && result) {
-    const currentKey = setOfKeys.shift();
-    result = result[currentKey as keyof typeof result];
-  }
+  const result =
+    setOfKeys &&
+    setOfKeys.reduce((acc, key) => {
+      if (acc && typeof acc === "object" && key in acc) {
+        return acc[key as keyof typeof acc];
+      }
+      return undefined;
+    }, object);
   if (isArray(result) || isObject(result)) {
     return "";
-  } else if (isString(result)) {
-    return `"${String(result)}"`;
-  } else return String(result);
+  }
+  return isString(result) ? `"${String(result)}"` : String(result);
 };
 
 //Components
@@ -69,7 +80,7 @@ const ValueObjectElement = (props: ValuePositionProps) => {
   return (
     <div key={uniqueKey}>
       <span
-        onClick={() => props.setIndex(getIndexFromKey(uniqueKey))}
+        onClick={() => props.setIndex(getIndexFromKey(props.keyName))}
         className="object-element-key"
       >{`${primaryKey}`}</span>
       <span>{`: `}</span>
@@ -99,6 +110,8 @@ const ArrayWrapper = (
 ) => {
   const primaryKey = props.keyName && props.keyName[props.keyName.length - 1];
   const uniqueKey = props.keyName.join(".");
+  const shoulDisplayComma = !props.isLastIndex;
+
   return (
     <div key={uniqueKey} className="element-wrapper">
       <div>
@@ -115,7 +128,7 @@ const ArrayWrapper = (
 
       <div>
         {`]`}
-        {!props.isLastIndex && <span>{","}</span>}
+        {shoulDisplayComma && <span>{","}</span>}
       </div>
     </div>
   );
@@ -124,10 +137,17 @@ const ArrayWrapper = (
 const ObjectWrapper = (
   props: WrapperPositionProps & { children: React.ReactNode }
 ) => {
+  const primaryKey = props.keyName && props.keyName[props.keyName.length - 1];
   const uniqueKey = props.keyName.join(".");
+  const shouldDisplayPrimaryKey =
+    primaryKey && !numberRegEx.test(primaryKey) && props.keyName.length > 1;
+  const shouldDisplayMainBracket = props.deep > 0;
+  const shoulDisplayComma = !props.isLastIndex;
+
   return (
     <div key={uniqueKey} className="element-wrapper">
-      <div>{`{`}</div>
+      {shouldDisplayPrimaryKey && <div>{`${primaryKey}: `}</div>}
+      {shouldDisplayMainBracket && <div>{`{`}</div>}
       <div
         className={"element-div"}
         style={{ marginLeft: (props.deep + 1) * 20 }}
@@ -135,7 +155,8 @@ const ObjectWrapper = (
         {props.children}
       </div>
       <div>
-        {`}`} {!props.isLastIndex && <span>{","}</span>}
+        {shouldDisplayMainBracket && "}"}
+        {shoulDisplayComma && <span>{","}</span>}
       </div>
     </div>
   );
@@ -241,22 +262,24 @@ const JsonParser = (props: JsonParserProps): JSX.Element => {
 // Test Data
 
 const test = {
-  date: "2021-10-27T07:49:14.896Z",
-  hasError: false,
-  fields: [
-    {
-      id: "4c212130",
-      prop: "iban",
-      value: "DE81200505501265402568",
-      hasError: false,
-    },
-    {
-      id: "4c212130",
-      prop: "iban",
-      value: "DE81200505501265402568",
-      hasError: false,
-    },
-  ],
+  res: {
+    date: "2021-10-27T07:49:14.896Z",
+    hasError: false,
+    fields: [
+      {
+        id: "4c212130",
+        prop: "iban",
+        value: "DE81200505501265402568",
+        hasError: false,
+      },
+      {
+        id: "4c212130",
+        prop: "iban",
+        value: "DE81200505501265402568",
+        hasError: false,
+      },
+    ],
+  },
 };
 
 // Main App
@@ -266,8 +289,10 @@ function App() {
   const [value, setValue] = useState<string>("");
 
   useEffect(() => {
-    const resultValue = getIndexValueFromObject(index, test);
-    setValue(resultValue);
+    if (index) {
+      const resultValue = getIndexValueFromObject(index, test);
+      setValue(resultValue);
+    } else setValue("");
   }, [index]);
   return (
     <div className="App">
